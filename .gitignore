@@ -5,7 +5,7 @@
 
 # config files
 config.conf
-
+build.bat
 
 # other
 *.o
