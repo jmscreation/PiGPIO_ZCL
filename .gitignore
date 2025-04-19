@@ -5,10 +5,9 @@
 
 # config files
 config.conf
-build.bat
+ssh_creds.bat
 
 # other
 *.o
 /.vscode
-upload.bat
 libraries/lib*

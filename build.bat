@@ -12,10 +12,6 @@ set CPP=arm-linux-gnueabihf-c++
 set GPP=arm-linux-gnueabihf-g++
 set GCC=arm-linux-gnueabihf-gcc
 
-set PI_USERNAME=
-set PI_HOSTNAME=
-set SSH_KEY=
-
 set VERSION=1
 
 set OUTPUT=program
@@ -29,6 +25,8 @@ set REBUILD_SOURCE_LIBRARIES=0
 set ASYNC_BUILD=1
 
 set LINK_ONLY=0
+
+call ssh_creds.bat
 
 :: Configure Source For Compiling And Additional Custom Library Directories / Names
 set SOURCE_DIRECTORIES=src

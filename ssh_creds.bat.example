@@ -1,0 +1,5 @@
+@echo off
+
+set PI_USERNAME=
+set PI_HOSTNAME=
+set SSH_KEY=
