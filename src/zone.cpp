@@ -46,8 +46,10 @@ void DigitalGPIO_Zone::set(int level) {
         if( gpio->write(level) ){
             set_state_level(level);
         } else {
-            std::cout << "gpio state change failure\n";
+            std::cerr << "gpio state change failure\n";
         }
+    } else {
+        std::cerr << "cannot set the state of an INPUT GPIO pin\n";
     }
 }
 
