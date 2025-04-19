@@ -1,0 +1,14 @@
+# ignore empty files
+*
+!/**/
+!*.*
+
+# config files
+config.conf
+
+
+# other
+*.o
+/.vscode
+upload.bat
+libraries/lib*

@@ -1,0 +1,3 @@
+#DEPENDENCIES
+
+https://github.com/jmscreation/libjsonloader		class
