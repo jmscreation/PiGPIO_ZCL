@@ -6,6 +6,7 @@
 # config files
 config.conf
 ssh_creds.bat
+install.sh
 
 # other
 *.o
