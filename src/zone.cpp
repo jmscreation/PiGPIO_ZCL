@@ -14,6 +14,7 @@ Zone::Zone(const std::string& name, IO type, bool invert, const ZoneMetaFields& 
     unique_id = std::regex_replace(name, std::regex("[^a-zA-Z0-9]"), "");
     state_changed = true;
     last_state_changed.setSeconds(100);
+    trigger_timeout = meta.trigger_timeout_threshold;
     
     metadata.saveProperty("name", name); // device name
     metadata.saveProperty("unique_id", unique_id); // device id
@@ -89,7 +90,7 @@ void ZoneManager::refresh_states() {
 void ZoneManager::update() {
     for(auto& ptr : zones){
         Zone& zone = *ptr;
-        if(zone.state_changed && zone.last_state_changed.getMilliseconds() > 100){
+        if(zone.state_changed && zone.last_state_changed.getMilliseconds() > zone.trigger_timeout){
             system->handle_device_updates(zone.get_unique_id(), zone.state);
             zone.state_changed = false;
             zone.last_state_changed.restart();
@@ -116,7 +117,8 @@ ZoneManager::ZoneManager(SecuritySystem* system): system(system) {
                 { "input", Zone::IO_INPUT }
             };
 
-            ZoneMetaFields meta;
+            ZoneMetaFields meta {};
+            meta.trigger_timeout_threshold = 100; // 100ms default trigger timeout
             std::string name, zone_type;
             int pin = -1;
             bool invert = false;
@@ -137,6 +139,7 @@ ZoneManager::ZoneManager(SecuritySystem* system): system(system) {
             json.loadProperty(zone, "device_class", meta.device_class);
             json.loadProperty(zone, "icon", meta.icon);
             json.loadProperty(zone, "invert", invert);
+            json.loadProperty(zone, "trigger_timeout", meta.trigger_timeout_threshold);
 
             std::string s_io, s_pmode;
             if(json.loadProperty(zone, "io", s_io) && io_modes.count(s_io)){

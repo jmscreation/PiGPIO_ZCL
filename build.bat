@@ -12,7 +12,7 @@ set CPP=arm-linux-gnueabihf-c++
 set GPP=arm-linux-gnueabihf-g++
 set GCC=arm-linux-gnueabihf-gcc
 
-set VERSION=1
+set VERSION=2
 
 set OUTPUT=program
 set DEBUGMODE=0
@@ -35,7 +35,7 @@ set LIBRARY_DIRECTORIES=libraries\pigpio libraries\PJON-13.1 libraries\libjsonlo
 set LIBRARY_NAMES=atomic
 
 :: Additional Compiler Flags And Configuration Settings
-set CPP_COMPILER_FLAGS=-std=c++20 -DSMCBUFSIZE=65535 -DLINUX -DSYS_VERSION="%VERSION%" -fdebug-prefix-map=%cd%=.
+set CPP_COMPILER_FLAGS=-std=c++20 -DSMCTOPICSIZE=1024 -DSMCBUFSIZE=65535 -DLINUX -DSYS_VERSION="%VERSION%" -fdebug-prefix-map=%cd%=.
 
 set C_COMPILER_FLAGS=
 set OBJECT_DIRECTORY=.objs
