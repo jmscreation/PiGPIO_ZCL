@@ -19,6 +19,7 @@
 struct ZoneMetaFields {
     std::string device_class;
     std::string icon;
+    uint32_t trigger_timeout_threshold;
 };
 
 class Zone {
@@ -27,6 +28,7 @@ class Zone {
     Clock last_state_changed;
     std::atomic_int16_t state;
     std::string unique_id;
+    int trigger_timeout;
 
 protected:
     void set_state_level(int16_t level) { state = level; state_changed = true; }

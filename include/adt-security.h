@@ -6,7 +6,7 @@
 #include "ReconnectingMqttClient.h"
 #include "zone.h"
 #include "gpio.h"
-#include "sha1.h"
+#include "sha1_local.h"
 
 #include <string>
 #include <map>
@@ -40,6 +40,7 @@ class SecuritySystem {
     //      ------- MQTT topics -------
     std::string mqtt_topic_version_info;
     std::string mqtt_topic_device_discovery;
+    std::string mqtt_topic_device_attributes;
     std::string mqtt_topic_homeassistant_status;
     std::string mqtt_topic_entity_state;
     std::string mqtt_topic_entity_update;
@@ -51,8 +52,10 @@ class SecuritySystem {
     
     std::map<std::string, std::vector<MQTTCallback>> sub_hooks;
 
-    static void static_mqtt_callback(const char *topic, const uint8_t *payload, uint16_t len, void *_this);
-    void mqtt_callback(const std::string& topic, const std::string& message);
+    static void static_mqtt_rx_callback(const char *topic, const uint8_t *payload, uint16_t len, void *_this);
+    static void static_mqtt_on_connect_callback(uint64_t retries, void *_this);
+    void mqtt_rx_callback(const std::string& topic, const std::string& message);
+    void mqtt_on_connect_callback(uint64_t retries);
 
     std::string calculate_serial();
     void connect(); // connect to MQTT broker
@@ -60,18 +63,17 @@ class SecuritySystem {
     void handle_device_commands(const std::string& topic, const std::string& json_payload); // handle all commands for device control
     void handle_device_updates(const std::string& zone_name, int level); // handle all zone updates and publish MQTT updates
 
-    bool mqtt_pub(const std::string& topic, const std::string& payload, bool retain = false, uint8_t qos=0);
+    bool mqtt_pub(const std::string& topic, const std::string& payload, bool retain = false, uint8_t qos=1);
     bool mqtt_sub(const std::string& topic, MQTTCallback cb, uint8_t qos=1);
 
 public:
     
-    // Security system connects to MQTT
+    // Security system connects to MQTT and loads/initializes all zones from config
     SecuritySystem(const std::string& config_string);
-    //SecuritySystem(const char* name, uint8_t ip[4], uint16_t port, const char* user, const char* password);
     
     virtual ~SecuritySystem();
 
-    bool online() const { return system_online;}
+    bool online() const { return system_online; }
     void shutdown_system();
     void run();
 

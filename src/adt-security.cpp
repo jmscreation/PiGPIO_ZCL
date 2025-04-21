@@ -50,6 +50,7 @@ serial_number(calculate_serial())
     mqtt_topic_version_info = system_name + "/version";
     mqtt_topic_device_discovery = "homeassistant/device/" + system_name + "/config";
     mqtt_topic_entity_state = system_name + "/state";
+    mqtt_topic_device_attributes = system_name + "/attr";
     mqtt_topic_entity_update = system_name + "/set";
     mqtt_topic_homeassistant_status = "homeassistant/status";
     mqtt_topic_system_status = system_name + "/system/status";
@@ -63,7 +64,10 @@ serial_number(calculate_serial())
     mqtt->will_topic = mqtt_topic_system_status;
     mqtt->will_payload = mqtt_will_payload;
     
-    zone_manager = new ZoneManager(this);
+    mqtt->set_receive_callback(&SecuritySystem::static_mqtt_rx_callback, this);
+    mqtt->set_on_connect_callback(&SecuritySystem::static_mqtt_on_connect_callback, this);
+
+    zone_manager = new ZoneManager(this); // Zone manager will load Zones, which may depend on a valid MQTT object
     
     {
         JsonLoader info;
@@ -76,12 +80,8 @@ serial_number(calculate_serial())
         
         system_version_json = info.toString();
     }
-    
-    connect();
-    
-    if(online()){
-        autodiscover();
-    }
+
+    connect(); // This will initialize the MQTT system and subscribe to all relavent topics
 }
 
 SecuritySystem::~SecuritySystem() {    
@@ -89,7 +89,7 @@ SecuritySystem::~SecuritySystem() {
         mqtt_pub(mqtt_topic_system_status, "offline");
 
         for(const auto& [topic,callback] : sub_hooks){
-            mqtt->send_subscribe(topic.c_str(), 1, true); // unsubscribe all topics
+            mqtt->unsubscribe(topic.c_str()); // unsubscribe all topics
         }
     }
 
@@ -134,24 +134,28 @@ std::string SecuritySystem::calculate_serial() {
     return serial;
 }
 
-void SecuritySystem::static_mqtt_callback(const char *topic, const uint8_t *payload, uint16_t len, void *_this) {
-    static_cast<SecuritySystem*>(_this)->mqtt_callback(topic, std::string((const char*)payload,len));
+void SecuritySystem::static_mqtt_rx_callback(const char *topic, const uint8_t *payload, uint16_t len, void *_this) {
+    static_cast<SecuritySystem*>(_this)->mqtt_rx_callback(topic, std::string((const char*)payload,len));
 }
 
-void SecuritySystem::mqtt_callback(const std::string& topic, const std::string& message) {
+void SecuritySystem::static_mqtt_on_connect_callback(uint64_t retries, void *_this) {
+    static_cast<SecuritySystem*>(_this)->mqtt_on_connect_callback(retries);
+}
+
+void SecuritySystem::mqtt_rx_callback(const std::string& topic, const std::string& message) {
     // handle wild card subscribed topics
-    for(auto& [ktop,cbs] : sub_hooks){
+    for(const auto& [ktop,cbs] : sub_hooks){
         if(topic.size() < ktop.size() - 1 || (!ktop.ends_with("#") && !ktop.ends_with("+"))) continue;
         if( topic.find_first_of(ktop.substr(0, ktop.size() - 1)) == 0) {
-            for(auto& cb : cbs){
+            for(const auto& cb : cbs){
                 cb(topic, message);
             }
         }
     }
 
     if(!sub_hooks.count(topic)) return;
-
-    for(auto& cb : sub_hooks.at(topic)){
+    // handle standard subscribed topics
+    for(const auto& cb : sub_hooks.at(topic)){
         cb(topic, message);
     }
 }
@@ -161,7 +165,7 @@ bool SecuritySystem::mqtt_pub(const std::string& topic, const std::string& paylo
 }
 
 bool SecuritySystem::mqtt_sub(const std::string& topic, MQTTCallback cb, uint8_t qos) {
-    bool status = mqtt->send_subscribe(topic.c_str(), qos);
+    bool status = mqtt->subscribe(topic.c_str(), qos);
 
     if(status){
         if(!sub_hooks.count(topic)){
@@ -197,7 +201,6 @@ void SecuritySystem::connect() {
         system_online = false;
         return;
     }
-    mqtt->set_receive_callback(&SecuritySystem::static_mqtt_callback, this);
 
     // subscribe to essential topics
     mqtt_sub(mqtt_topic_homeassistant_status, [=,this](const std::string& topic, const std::string& status){
@@ -218,13 +221,26 @@ void SecuritySystem::connect() {
     mqtt_sub(mqtt_topic_entity_update + "/+",[=,this](const std::string& topic, const std::string& payload){
         handle_device_commands(topic.substr(topic.find_last_of("/") + 1), payload);
     });
-
-    // publish essential information
-    mqtt_pub(mqtt_topic_version_info, system_version_json);    
-    system_online = true;
 }
 
+// When the MQTT system is connected OR the MQTT system reconnects after an inturruption
+void SecuritySystem::mqtt_on_connect_callback(uint64_t retries) {
+    system_online = true;
 
+    if(retries > 0){
+        for(const auto& [topic,cbs] : sub_hooks){
+            mqtt->subscribe(topic.c_str());
+        }
+    }
+
+    mqtt_pub(mqtt_topic_version_info, system_version_json);
+    autodiscover();
+}
+
+/*
+    Generate the MQTT Device Discovery for HASS
+    Dynamically load all Zones, then generate the device discovery payload
+*/
 void SecuritySystem::autodiscover() {
     JsonLoader json;
 
@@ -261,6 +277,7 @@ void SecuritySystem::autodiscover() {
 
         json.saveProperty(cmp, "state_topic", mqtt_topic_entity_state + "/" + id);
         json.saveProperty(cmp, "command_topic", mqtt_topic_entity_update + "/" + id);
+        json.saveProperty(cmp, "json_attr_t", mqtt_topic_device_attributes + "/" + id);
         
         json.saveProperty(cmps, (new std::string(id))->c_str() , cmp);
     }
@@ -271,8 +288,6 @@ void SecuritySystem::autodiscover() {
     mqtt_pub(mqtt_topic_device_discovery, device_discovery_payload, true, 1);
     
     mqtt_pub(mqtt_topic_system_status, mqtt_birth_payload, false, 1);
-    
-    // std::cout << mqtt_topic_device_discovery << "\n" << device_discovery_payload << "\n";
 
     zone_manager->refresh_states(); // refresh all the entity states so the MQTT can get the latest image
 }

@@ -31,6 +31,10 @@ typedef void(*RMCReceiveCallback)(
         uint16_t len,
         void     *custom_ptr
 );
+typedef void(*OnConnectCallback)(
+  uint64_t reconnect,   
+  void *custom_ptr
+);
 
 class ReconnectingMqttClient {
 public:
@@ -52,9 +56,9 @@ public:
   const uint16_t KEEPALIVE_S = 60, PING_TIMEOUT = 15000;
   const uint32_t READ_TIMEOUT = 10000;
 
-  String topic, client_id, user, password, will_payload, will_topic;
+  String client_id, user, password, will_payload, will_topic;
   bool will_retain = false;
-  uint8_t server_ip[4], sub_qos = 1;
+  uint8_t server_ip[4];
   uint16_t port = 1883;
 
 private:
@@ -65,8 +69,11 @@ private:
   bool waiting_for_ping = false;
   uint32_t last_packet_in = 0, last_packet_out = 0;
   int8_t last_connect_error = 0x7F; // Unknown
+  uint64_t connect_retries = 0;
   RMCReceiveCallback receive_callback = NULL;
-  void *custom_ptr = NULL; // Custom data for the callback, for example a pointer to a derived class object
+  OnConnectCallback on_connect_callback = NULL;
+  void *custom_ptr_receive = NULL; // Custom data for the callback, for example a pointer to a derived class object
+  void *custom_ptr_on_connect = NULL; // Custom data for the callback, for example a pointer to a derived class object
   char topicbuf[SMCTOPICSIZE];
   uint8_t buffer[SMCBUFSIZE];
   volatile bool last_sub_acked = false, last_pub_acked = false; // With QoS 1 the success of the last SUB or PUB can be checked
@@ -134,6 +141,13 @@ private:
     uint32_t in = last_packet_in == 0 ? 1000000000 : (uint32_t)(millis() - last_packet_in),
              out = last_packet_out == 0 ? 1000000000 : (uint32_t)(millis() - last_packet_out);
     return in < out ? in : out;
+  }
+
+  void socket_reconnect() {
+    send_disconnect();
+    client.stop();
+    cleanup_system();
+    start();
   }
 
   bool write_to_socket(const uint8_t *buf, const uint16_t len) {
@@ -246,14 +260,11 @@ private:
     if (write_to_socket(buffer, len)) {
       response_delay();
       uint16_t packet_len, payload_len;
-      if (read_packet_from_socket(buffer, sizeof buffer, packet_len, payload_len)) {
+      if (read_packet_from_socket(buffer, sizeof(buffer), packet_len, payload_len)) {
         if (packet_len == 4 && buffer[0] == CONNACK) {
-          if (buffer[3] == 0) {
-            // Subscribe if a topic has been set
-            if (topic.length() > 0) {
-              bool ok = send_subscribe(topic.c_str(), sub_qos);
-              if (!ok) stop();
-            }
+          if (buffer[3] == 0) { // Connection Successful
+            // Call the OnConnect callback so the client can resubscribe to all topics
+            on_connect_callback(connect_retries++, custom_ptr_on_connect);
             return client.connected();
           }
           else last_connect_error = buffer[3]; // Got an error code
@@ -269,6 +280,7 @@ private:
       uint8_t s0 = buf[pos++], s1 = buf[pos++];
       uint16_t textlen = (s0 << 8) | s1;
       assert(pos + textlen < SMCBUFSIZE);
+      assert(textlen < SMCTOPICSIZE);
       memcpy(topicbuf, &buf[pos], textlen);
       topicbuf[textlen] = 0; // Null terminator
       pos += textlen;
@@ -281,13 +293,25 @@ private:
         sendbuf[3] = buf[pos++]; // message id LSB
         write_to_socket(sendbuf, 4);
       }
-      receive_callback(topicbuf, &buf[pos], packet_len - pos, custom_ptr);
+      receive_callback(topicbuf, &buf[pos], packet_len - pos, custom_ptr_receive);
     }
   }
 
   void send_ping_if_needed() {
-    if (inactivity_time() > PING_TIMEOUT) {
-      if (waiting_for_ping) { stop(); start(); } else send_pingreq();
+    static uint32_t timeout = millis();
+    static int retries = 3; // retry the ping 3 times
+
+    if(inactivity_time() > PING_TIMEOUT && timeout > PING_TIMEOUT) {
+      if(waiting_for_ping){
+        if(retries++ > 3 || !send_pingreq()){
+          socket_reconnect();
+          return;
+        }
+      } else {
+        timeout = millis();
+        retries = 3;
+        send_pingreq();
+      } 
     }
   }
 
@@ -308,8 +332,6 @@ private:
     }
   }
 
-public:
-  // this should be public because the existing subscribe method is not sufficient
   bool send_subscribe(const char *topic, const uint8_t qos, bool unsubscribe = false) {
     last_sub_acked = false;
     if (client.connected()) {
@@ -343,13 +365,23 @@ public:
   ReconnectingMqttClient(const uint8_t server_ip[4], const uint16_t server_port, const char *client_id) {
     set_address(server_ip, server_port, client_id);
   }
-  ~ReconnectingMqttClient() { stop(); }
+  ~ReconnectingMqttClient() {
+    stop();
+  }
 
   void set_address(const uint8_t server_ip[4], const uint16_t server_port, const char *client_id) {
-    memcpy(this->server_ip, server_ip, 4); port = server_port; this->client_id = client_id; start();
+    memcpy(this->server_ip, server_ip, 4);
+    port = server_port;
+    this->client_id = client_id;
+    start();
   }
   void set_receive_callback(RMCReceiveCallback callback, void *custom_pointer) {
-    receive_callback = callback; custom_ptr = custom_pointer;
+    receive_callback = callback;
+    custom_ptr_receive = custom_pointer;
+  }
+  void set_on_connect_callback(OnConnectCallback callback, void *custom_pointer) {
+    on_connect_callback = callback;
+    custom_ptr_on_connect = custom_pointer;
   }
 
   bool publish(const char *topic, const uint8_t *payload, const uint16_t payloadlen, const  bool retain, const uint8_t qos = 0) {
@@ -382,15 +414,10 @@ public:
 
   // When subscribing, multiple topics can be listed separated by comma
   bool subscribe(const char *topic, const uint8_t qos = 1) {
-    if (this->topic.c_str()[0]) unsubscribe();
-    this->topic = topic;
-    sub_qos = qos;
-    return send_subscribe(this->topic.c_str(), qos, false);
+    return send_subscribe(topic, qos, false);
   }
-  bool unsubscribe() {
-    bool ok = send_subscribe(this->topic.c_str(), 0, true);
-    this->topic = "";
-    return ok;
+  bool unsubscribe(const char *topic, const uint8_t qos = 1) {
+    return send_subscribe(topic, qos, true);
   }
 
   void update() {
@@ -417,20 +444,32 @@ public:
     }
   }
 
-  void start() { enabled = true; last_packet_in = last_packet_out = millis(); init_system(); }
+  void start() {
+    enabled = true;
+    last_packet_in = last_packet_out = millis();
+    init_system();
+  }
+
   void stop() {
-    if (this->topic.length() > 0) send_subscribe(this->topic.c_str(), true);
     send_disconnect();
     client.stop();
     enabled = false;
+    connect_retries = 0;
     cleanup_system();
   }
 
   bool connect() {
-    if (!client.connected() && enabled) return socket_connect();
+    if (!client.connected() && enabled){
+      return socket_connect();
+    }
     return client.connected();
   }
-  bool is_connected() { if (!client.connected()) client.stop(); return client.connected(); }
+  bool is_connected() {
+    if(!client.connected()){
+      client.stop();
+    }
+    return client.connected();
+  }
 
   // The subscribe call and the publish calls With QoS 1 will return true or false depending on whether
   // the message was written, not whether an ACK was received. This can be checked here, and it may be set
