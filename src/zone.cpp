@@ -79,14 +79,16 @@ int Virtual_Zone::get() {
 
 /* Zone Manager */
 
+// Automatic state refresh forces all zones to re-check and report their state
 void ZoneManager::refresh_states() {
     for(auto& zone : zones){
-        if(zone->last_state_changed.getSeconds() > 1){
-            zone->state_changed = true;
+        if(zone->last_state_changed.getMilliseconds() > zone->trigger_timeout){
+            zone->state_changed = true; // force the zone to update its state regardlees if it changed or not
         }
     }
 }
 
+// This is the main event loop which will handle all events for all zones
 void ZoneManager::update() {
     for(auto& ptr : zones){
         Zone& zone = *ptr;

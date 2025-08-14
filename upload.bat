@@ -8,4 +8,5 @@ echo Uploading To Pi...
 	:: Remote Update - Send Updates To Remote Server For Update
 	scp -i %SSH_KEY% .\%OUTPUT% %PI_USERNAME%@%PI_HOSTNAME%:~/program
 	scp -i %SSH_KEY% .\config.conf %PI_USERNAME%@%PI_HOSTNAME%:~/config.conf
-	scp -i %SSH_KEY% .\install.sh %PI_USERNAME%@%PI_HOSTNAME%:~/install.sh
+	scp -i %SSH_KEY% .\install-service.sh %PI_USERNAME%@%PI_HOSTNAME%:~/install.sh
+ssh -i %SSH_KEY% %PI_USERNAME%@%PI_HOSTNAME% "chmod a+x ~/install.sh"
