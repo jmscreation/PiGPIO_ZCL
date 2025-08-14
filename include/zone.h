@@ -31,7 +31,7 @@ class Zone {
     int trigger_timeout;
 
 protected:
-    void set_state_level(int16_t level) { state = level; state_changed = true; }
+    void set_state_level(int16_t level) { last_state_changed.restart(); state = level; state_changed = true; }
 
     JsonLoader metadata;
 
