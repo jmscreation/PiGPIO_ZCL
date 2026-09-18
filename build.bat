@@ -12,7 +12,7 @@ set CPP=arm-linux-gnueabihf-c++
 set GPP=arm-linux-gnueabihf-g++
 set GCC=arm-linux-gnueabihf-gcc
 
-set VERSION=2
+set VERSION=2.1
 
 set OUTPUT=program
 set DEBUGMODE=0
