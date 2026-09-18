@@ -13,7 +13,7 @@ For this project, we will assume that you already have an **MQTT Broker/Server**
 ## Configure and Install
 
 1. First, you'll need to create a _config.conf_ file. You can use the [default_config.conf](https://github.com/jmscreation/PiGPIO_ZCL/blob/fbe8872b78c6eda550c1cfcaa16e78300a9133d6/default_config/default_config.conf) file as a guide
-2. Next, download the [Latest Release](https://github.com/jmscreation/PiGPIO_ZCL/tree/v0.2.1) of the service, or build it yourself*
+2. Next, download the [Latest Release](https://github.com/jmscreation/PiGPIO_ZCL/releases/tag/v0.2.1) of the service, or build it yourself*
 3. Upload _install.sh_, _config.conf_, and _program_ to the Raspberry Pi
 4. Run `sudo install.sh` with both the _program_ and _config.conf_ file in the same directory
 5. Check to ensure your device is connected to your MQTT server, and that Home Assistant can see your new Zone Controller
