@@ -15,6 +15,12 @@ serial_number(calculate_serial())
         return;
     }
 
+    { // disable GPIO signal handlers
+        unsigned int cfg = gpioCfgGetInternals();
+        cfg |= PI_CFG_NOSIGHANDLER; // Bitmask value: (1 << 10)
+        gpioCfgSetInternals(cfg);
+    }
+
     int gpio_state = gpioInitialise();
     
     if(gpio_state != PIGPIO_VERSION){
@@ -313,7 +319,7 @@ void SecuritySystem::run() {
         std::cout << "failed to start system runtime!\n";
     } else {
         Clock refreshTimeout;
-        while(system_online) {
+        while(system_online.load()) {
             mqtt->update();
             zone_manager->update();
 
@@ -332,5 +338,5 @@ void SecuritySystem::run() {
 }
 
 void SecuritySystem::shutdown_system() {
-    system_online = false;
+    system_online.store(false);
 }

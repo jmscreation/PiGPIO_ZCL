@@ -301,7 +301,10 @@ private:
     static uint32_t timeout = millis();
     static int retries = 3; // retry the ping 3 times
 
-    if(inactivity_time() > PING_TIMEOUT && timeout > PING_TIMEOUT) {
+    uint32_t duration = (uint32_t)(millis() - timeout);
+    
+    // if the timeout goes beyond the keep alive then we must send a ping up to a second before it disconnects
+    if( (inactivity_time() > PING_TIMEOUT && duration > PING_TIMEOUT) || duration > KEEPALIVE_S * 1000 - 1000 ) {
       if(waiting_for_ping){
         if(retries++ > 3 || !send_pingreq()){
           socket_reconnect();

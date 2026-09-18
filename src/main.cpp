@@ -12,17 +12,16 @@ namespace fs = std::filesystem;
 
 static SecuritySystem* system_service = nullptr;
 
-void signalHandler(int signum) {
-    if (signum == SIGTERM) {
-        std::cout << "... SIGTERM" << std::endl;
 
+void signalHandler(int signum) {
+    if (signum == SIGTERM || signum == SIGINT) {
         system_service->shutdown_system();
     }
 }
 
 int main(int argc, const char* argv[]) {
     // Register the signal handler for SIGTERM
-    if (signal(SIGTERM, signalHandler) == SIG_ERR) {
+    if (signal(SIGTERM, signalHandler) == SIG_ERR || signal(SIGINT, signalHandler) == SIG_ERR) {
         std::cerr << "Error registering signal handler." << std::endl;
         return 1;
     }

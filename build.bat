@@ -12,7 +12,7 @@ set CPP=arm-linux-gnueabihf-c++
 set GPP=arm-linux-gnueabihf-g++
 set GCC=arm-linux-gnueabihf-gcc
 
-set VERSION=2
+set VERSION=2.1
 
 set OUTPUT=program
 set DEBUGMODE=0
@@ -58,7 +58,7 @@ set SINGLE_FILE=%1
 if %DEBUGMODE% EQU 0 (
 	set CPP_COMPILER_FLAGS=%CPP_COMPILER_FLAGS% -O3 -Os
 ) else (
-	set CPP_COMPILER_FLAGS=%CPP_COMPILER_FLAGS% -DDEBUGMODE
+	set CPP_COMPILER_FLAGS=%CPP_COMPILER_FLAGS% -DDEBUGMODE -DMQTT_DEBUGPRINT
 )
 
 :: ---------- Build Script Start -----------

@@ -7,8 +7,12 @@
 config.conf
 ssh_creds.bat
 install.sh
+*.ppk
+*.pem
 
 # other
 *.o
 /.vscode
 libraries/lib*
+
+README.md
