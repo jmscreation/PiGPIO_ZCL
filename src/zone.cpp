@@ -26,6 +26,18 @@ Zone::Zone(const std::string& name, IO type, bool invert, const ZoneMetaFields& 
     if(!meta.icon.empty()) metadata.saveProperty("icon", meta.icon); // device class type
 }
 
+void Zone::set_state_level(int16_t level) {
+    if(state.load() == level) return;
+    if(last_state_changed.getMilliseconds() < 20.0 && state_changed && _last_state == level){
+        state_changed = false; // a sudden flip will stop the state change
+    } else {
+        state_changed = true;
+    }
+    state.store(level);
+    _last_state = level;
+    last_state_changed.restart();
+}
+
 
 DigitalGPIO_Zone::DigitalGPIO_Zone(const std::string& name, IO type, int pin, bool invert, const ZoneMetaFields& meta, GPIO::PinType mode):
     Zone(name, type, invert, meta),
@@ -81,6 +93,7 @@ int Virtual_Zone::get() {
 
 // Automatic state refresh forces all zones to re-check and report their state
 void ZoneManager::refresh_states() {
+    std::cout << "force refresh states\n";
     for(auto& zone : zones){
         if(zone->last_state_changed.getMilliseconds() > zone->trigger_timeout){
             zone->state_changed = true; // force the zone to update its state regardlees if it changed or not

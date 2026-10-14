@@ -25,13 +25,14 @@ struct ZoneMetaFields {
 class Zone {
 
     std::atomic_bool state_changed;
+    int16_t _last_state;
     Clock last_state_changed;
     std::atomic_int16_t state;
     std::string unique_id;
     int trigger_timeout;
 
 protected:
-    void set_state_level(int16_t level) { last_state_changed.restart(); state = level; state_changed = true; }
+    void set_state_level(int16_t level);
 
     JsonLoader metadata;
 

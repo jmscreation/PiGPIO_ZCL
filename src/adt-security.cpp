@@ -90,7 +90,7 @@ serial_number(calculate_serial())
     connect(); // This will initialize the MQTT system and subscribe to all relavent topics
 }
 
-SecuritySystem::~SecuritySystem() {    
+SecuritySystem::~SecuritySystem() {
     if(mqtt != nullptr && mqtt->is_connected()){
         mqtt_pub(mqtt_topic_system_status, "offline");
 
@@ -310,7 +310,7 @@ void SecuritySystem::handle_device_commands(const std::string& unique_id, const 
 }
 
 void SecuritySystem::handle_device_updates(const std::string& device_id, int level) {
-    std::cout << "device state changed: " << device_id << " is now " << level << "\n";
+    // std::cout << "device state changed: " << device_id << " is now " << level << "\n";
     mqtt_pub(mqtt_topic_entity_state + "/" + device_id, std::to_string(level), false, 1);
 }
 

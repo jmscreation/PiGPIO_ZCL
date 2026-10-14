@@ -4,7 +4,7 @@
 #include <chrono>
 #include <atomic>
 
-typedef std::chrono::time_point<std::chrono::system_clock> timepoint;
+typedef std::chrono::time_point<std::chrono::steady_clock> timepoint;
 
 class Clock {
     std::atomic<timepoint> start;
@@ -16,7 +16,7 @@ public:
 
     double getSeconds() const;
     double getMilliseconds() const;
-    inline void restart() { start = std::chrono::system_clock::now(); }
+    inline void restart() { start = std::chrono::steady_clock::now(); }
     void setSeconds(double time);
     void setMilliseconds(double time);
 };
